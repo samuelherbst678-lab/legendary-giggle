@@ -1,1 +1,171 @@
-m
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Cocktail Rezepte</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+* { box-sizing: border-box; }
+body { margin:0; font-family:system-ui,sans-serif; background:#0d0d0d; color:#f2f2f2; padding:20px;}
+h1{text-align:center;margin-bottom:20px;}
+.app{max-width:1000px;margin:auto;}
+.form{background:#1a1a1a;padding:18px;border-radius:14px;display:grid;gap:12px;}
+input,textarea,select,button{padding:10px;border-radius:8px;border:none;font-size:14px;}
+textarea{min-height:110px;resize:vertical;}
+button{background:#c9a35b;color:#000;font-weight:bold;cursor:pointer;}
+button.secondary{background:#333;color:#fff;}
+.ingredients{display:grid;gap:8px;}
+.ingredient-row{display:grid;grid-template-columns:2fr 1fr 1.5fr auto;gap:8px;}
+.stars{display:flex;gap:4px;font-size:26px;cursor:pointer;}
+.star{color:#444;}
+.star.active{color:gold;}
+.list{margin-top:30px;display:grid;gap:16px;}
+.card{background:#1b1b1b;padding:16px;border-radius:14px;}
+.meta{font-size:13px;opacity:0.85;}
+.delete{background:#a33;color:white;margin-top:10px;}
+.empty{text-align:center;opacity:0.6;}
+</style>
+</head>
+<body>
+<div class="app">
+<h1>🍸 Cocktail Rezepte</h1>
+
+<div class="form">
+<input id="name" placeholder="Name des Cocktails">
+<div>
+<strong>Zutaten</strong>
+<div id="ingredients" class="ingredients"></div>
+<button class="secondary" onclick="addIngredient()">+ Zutat hinzufügen</button>
+</div>
+
+<textarea id="instructions" placeholder="Zubereitung"></textarea>
+
+<select id="type">
+  <option>Alkoholisch</option>
+  <option>Alkoholfrei</option>
+</select>
+
+<select id="color">
+  <option value="">Grundfarbe wählen</option>
+  <option>Klar / Transparent</option>
+  <option>Gelb</option>
+  <option>Orange</option>
+  <option>Rot</option>
+  <option>Rosa</option>
+  <option>Lila</option>
+  <option>Blau</option>
+  <option>Grün</option>
+  <option>Braun</option>
+  <option>Schwarz</option>
+  <option>Mehrfarbig</option>
+</select>
+
+<div>
+<strong>Bewertung</strong>
+<div id="stars" class="stars"></div>
+</div>
+
+<button onclick="addCocktail()">Rezept speichern</button>
+</div>
+
+<div id="list" class="list"></div>
+</div>
+
+<script>
+let cocktails = JSON.parse(localStorage.getItem("cocktails")) || [];
+let currentRating = 0;
+const units = ["ml","cl","dl","l","TL","EL","oz","cup","dash","splash","Tropfen","Prise","Stück","Scheibe","Blatt"];
+
+function save(){ localStorage.setItem("cocktails", JSON.stringify(cocktails)); }
+
+function addIngredient(name="", amount="", unit="ml"){
+  const row = document.createElement("div");
+  row.className="ingredient-row";
+  const unitOptions=units.map(u=>`<option ${u===unit?"selected":""}>${u}</option>`).join("");
+  row.innerHTML=`
+    <input placeholder="Zutat" value="${name}">
+    <input type="number" step="0.5" placeholder="Menge" value="${amount}">
+    <select>${unitOptions}</select>
+    <button class="secondary" onclick="this.parentElement.remove()">✕</button>
+  `;
+  document.getElementById("ingredients").appendChild(row);
+}
+
+function initStars(){
+  const container=document.getElementById("stars");
+  container.innerHTML="";
+  for(let i=1;i<=10;i++){
+    const star=document.createElement("span");
+    star.className="star";
+    star.innerHTML="★";
+    star.onclick=()=>setRating(i/2);
+    container.appendChild(star);
+  }
+  updateStars();
+}
+
+function setRating(val){ currentRating=val; updateStars(); }
+function updateStars(){ document.querySelectorAll(".star").forEach((s,i)=>{ s.classList.toggle("active",i<currentRating*2); }); }
+
+function addCocktail(){
+  const ingredients=[...document.querySelectorAll(".ingredient-row")].map(r=>{
+    const inputs=r.querySelectorAll("input,select");
+    return {name:inputs[0].value, amount:inputs[1].value, unit:inputs[2].value};
+  });
+
+  const cocktail={
+    name: document.getElementById("name").value.trim(),
+    ingredients,
+    instructions: document.getElementById("instructions").value.trim(),
+    type: document.getElementById("type").value,
+    color: document.getElementById("color").value,
+    rating: currentRating
+  };
+
+  if(!cocktail.name) return alert("Name fehlt.");
+  cocktails.push(cocktail);
+  save();
+  render();
+  clearForm();
+}
+
+function deleteCocktail(i){ cocktails.splice(i,1); save(); render(); }
+
+function clearForm(){
+  document.getElementById("name").value="";
+  document.getElementById("instructions").value="";
+  document.getElementById("type").value="Alkoholisch";
+  document.getElementById("color").value="";
+  currentRating=0;
+  document.getElementById("ingredients").innerHTML="";
+  addIngredient();
+  updateStars();
+}
+
+function render(){
+  const list=document.getElementById("list");
+  list.innerHTML="";
+  if(!cocktails.length){ list.innerHTML='<div class="empty">Noch keine Cocktails gespeichert.</div>'; return; }
+  cocktails.forEach((c,i)=>{
+    const card=document.createElement("div");
+    card.className="card";
+    const ingr=c.ingredients.map(z=>`${z.amount||""} ${z.unit} ${z.name}`).join("<br>");
+    card.innerHTML=`
+      <h2>${c.name}</h2>
+      <div class="meta">${c.type} · Farbe: ${c.color||"–"} · ⭐ ${c.rating}</div>
+      <p><strong>Zutaten:</strong><br>${ingr}</p>
+      <p><strong>Zubereitung:</strong><br>${c.instructions}</p>
+      <button class="delete" onclick="deleteCocktail(${i})">Löschen</button>
+    `;
+    list.appendChild(card);
+  });
+}
+
+// Initialisierung
+render();
+initStars();
+if(document.getElementById("ingredients").children.length===0) addIngredient();
+</script>
+</body>
+</html>
